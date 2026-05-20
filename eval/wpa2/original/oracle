@@ -1,0 +1,203 @@
+#!/usr/bin/python3
+# coding: utf-8
+import sys
+import re
+lines = sys.stdin.readlines()
+
+l0 = []
+l1 = []
+l2 = []
+l3 = []
+l4 = []
+l5 = []
+l6 = []
+
+lemma = sys.argv[1]
+
+
+for line in lines:
+	num = line.split(':')[0]
+
+	def match(l, *keywords):
+		res = False
+		for k in keywords:
+			res = not re.search(k, line) is None
+			if res: break
+		if res: l.append(num)
+		return res
+
+	def utTamarin(lem, important, unimportant):
+		important = [": " + fact for fact in important] + [": !" + fact for fact in important]
+		unimportant = [": " + fact for fact in unimportant] + [": !" + fact for fact in unimportant]
+		if lemma == lem:
+			(
+			match(l1, r"^[^∀∃]*\[\+\]") or  #the important list doesn't overrule [+]
+			match(l2, *important) or
+			match(l4, *unimportant) or
+			match(l3, "")
+			)
+
+	utTamarin("authenticator_used_ptks_must_be_installed",["AuthSenderPTK"],["In_Supp","In_Auth","AuthGTKState"])
+	utTamarin("authenticator_use_gtk_must_be_preceded_by_install_gtk",["AuthGTKState"],["In_Supp","In_Auth"])
+	utTamarin("authenticator_use_gtk_must_be_preceded_by_set_share_gtk",["AuthGTKState"],["In_Supp","In_Auth"])
+	utTamarin("supplicant_used_ptks_must_be_installed",["SuppSenderPTK"],["In_Supp","In_Auth","AuthGTKState"])
+	utTamarin("authenticator_wnm_sleep_thread_has_to_start",["AuthWNMState"],["In_Supp","In_Auth","AuthGTKState"])
+	utTamarin("different_ptk_id_must_have_different_ptk_nonce_pairs",["SuppInstallPTKCommand"],["In_Supp","In_Auth","AuthGTKState"])
+	utTamarin("authenticator_authentication",["In_Auth"],["In_Supp","AuthGTKState"])
+	utTamarin("authenticator_shared_gtk_must_be_set",["AuthGTKState"],["In_Supp","In_Auth"])
+	utTamarin("authenticator_installed_must_be_preceded_by_associate", [], ["AuthReceiverPTK","In_Supp","In_Auth","AuthGTKState"])
+	utTamarin("authenticator_shared_gtk_is_ku_secret", [], ["AuthState","AuthGTKState","In_Supp","In_Auth"])
+	utTamarin("supplicant_gtk_installation_is_unique_for_gtk_id", ["SupplicantInstalledGTK"], ["In_Supp","In_Auth","AuthGTKState"])
+	
+
+	# all lemmas that are not in the deny list and that are not already in a previous utTamarin(specialized)
+	for rest in ["nonce_reuse_key_type"
+			,"associated_parties_need_to_be_created"
+			,"association_of_authenticator_with_supplicant_is_unique"
+			,"authenticator_gtk_rekey_must_be_preceded_by_create"
+			,"authenticator_encryption_gtks_must_be_installed"
+			,"authenticator_must_send_an_initial_m1"
+			,"authenticator_snd_m1_is_unique_for_anonce"
+			,"supplicant_must_receive_an_initial_m1"
+			,"authenticator_snd_m1_precedes_rcv_m2"
+			,"authenticator_must_receive_an_initial_m2"
+			,"authenticator_rcv_m2_must_be_preceded_by_snd_m1"
+			,"authenticator_rcv_m2_is_unique_for_anonce"
+			,"authenticator_must_send_an_initial_m3"
+			,"authenticator_rercv_m2_precedes_snd_m3"
+			,"authenticator_snd_m3_is_unique_for_anonce"
+			,"supplicant_rercv_m1_precedes_rcv_m3"
+			,"supplicant_rercv_m3_or_gtk_rekey_must_be_preceded_by_rcv_m3"
+			,"supplicant_rcv_m1_must_be_preceded_by_associate"
+			,"supplicant_rcv_m3_must_be_preceded_by_associate"
+			,"supplicant_initial_rcv_m3_is_unique_for_snonce"
+			,"supplicant_rercv_m3_or_gtk_rekey_must_be_preceded_by_send_m4"
+			,"supplicant_send_m4_must_be_preceded_by_rcv_m3"
+			,"authenticator_snd_m3_rpt_precedes_rcv_m4"
+			,"authenticator_installed_is_unique_for_anonce"
+			,"authenticator_wnm_sleep_thread_is_unique"
+			,"supplicant_wnm_sleep_thread_is_unique"
+			,"authenticator_gtk_init_again_must_be_preceded_by_init"
+			,"authenticator_gtk_init_must_be_preceded_by_installed"
+			,"authenticator_gtk_rekey_finished_must_be_preceded_by_init"
+			,"authenticator_gtk_rekey_must_be_preceded_by_send_initial_m3"
+			,"authenticator_installed_must_be_preceded_by_send_initial_m3"
+			,"only_one_supplicant_can_be_installed_for_a_pmk"
+			,"pmks_are_secret_unless_revealed"
+			,"pmks_are_ku_secret_unless_revealed"
+			,"supplicant_ptk_installation_is_unique_for_ptk"
+			,"authenticator_ptk_installation_is_unique_for_ptk"
+			,"ptk_nonce_must_use_sender_id"
+			,"authenticator_and_supplicant_have_different_ptk_nonce_pairs"
+			,"ptk_nonce_pair_is_unique"
+			,"supplicant_ptk_is_secret"
+			,"supplicant_preliminary_ptk_is_secret"
+			,"authenticator_ptk_is_secret"
+			,"authenticator_preliminary_ptk_is_secret"
+			,"authenticator_gtk_installation_is_unique_for_gtk"
+			,"gtk_nonce_pair_is_unique"
+			,"authenticator_gtk_is_secret"
+			,"authenticator_gtk_is_ku_secret"
+			,"authenticator_sets_share_gtk_is_secret"
+			,"authenticator_sets_share_gtk_is_ku_secret"
+			,"supplicant_receiver_gtk_must_be_installed"
+			,"supplicant_gtk_is_secret"
+			,"supplicant_gtk_is_ku_secret"
+			]:
+		utTamarin(rest, [], ["In_Supp", "In_Auth", "AuthGTKState"])
+
+	for kuStuff in [  #from the deny list:
+			"supplicant_ptk_is_ku_secret"
+			,"supplicant_preliminary_ptk_is_ku_secret"
+			,"authenticator_ptk_is_ku_secret"
+			,"authenticator_preliminary_ptk_is_ku_secret"]:
+		utTamarin(kuStuff, [r"KU\( snenc", r"KU\( KDF"], ["In_Supp", "In_Auth", "AuthGTKState"])  #need to pronounce KU because [+] disappears
+
+	#manual proofs
+	if lemma == "authenticator_authentication":  #follows strictly the manual proof
+		(
+		match(l1, "⊥") or
+		match(l2, "KU.*MIC") or
+		match(l3, "")
+		)
+
+	if lemma == "supplicant_authentication":  #follows strictly the manual proof
+		(
+		match(l1, "⊥") or
+		match(l2, "KU.*MIC") or
+		match(l3, "In_Supp") or
+		match(l4, "AuthState") or
+		match(l5, "")
+		)
+
+	if lemma == "supplicant_gtk_installation_means_auth_sent_gtk":  #follows strictly the manual proof
+		(
+		match(l6, "ReceiverGTK", "'PTK_START'", r"minus_1(..)?\) \) @") or
+		match(l0, "SuppReceiverPTK.*#i$", "AuthStartWNMSleepModeThread.*#j.2$", "AuthInstalledSenderPTK.*#j.(7|8)$") or  #for the last case
+		match(l1, "⊥") or
+		match(l2, "In_Supp.*#(vr|i)$", r"KU\( snenc.*#vk$", r"KU\( senc.*#vk.6") or
+		match(l3, "#i$", "#j$", "#vk$") or
+		match(l5, "")
+		)
+
+	#proofs that did not work with utTamarin(oracle) as a direct adaption from uttamarin
+	if lemma == "helper_authenticator_gtk_installation_is_unique_for_gtk":  #follows strictly the proof from uttamarin
+		(
+		match(l2, "#i$", "#j$") or
+		match(l5, "")
+		)
+
+	if lemma == "gtk_encryption_nonces_increase_strictly_over_time":  #follows strictly the proof from uttamarin
+		(
+		match(l0, "#i = #", r"last\(#j\)\)  ∥", r"< #.*∥ \(∃") or
+		match(l1, r"^[^∀∃]*\[\+\]") or
+		match(l2, "AuthInstalledGTK") or
+		match(l5, "In_Supp","In_Auth","AuthGTKState") or
+		match(l4, "")
+		)
+
+	if lemma == "no_nonce_reuse_for_installed_gtk":  #follows strictly the proof from uttamarin
+		(
+		match(l5, "In_Supp","In_Auth","AuthGTKState") or
+		match(l4, "")
+		)
+
+	if lemma == "supplicant_ptk_nonce_pair_is_unique":  #follows strictly the proof from uttamarin
+		(
+		match(l0, "∀") or
+		match(l1, r"^[^∀∃]*\[\+\]") or
+		match(l2, "= #vr") or
+		match(l3, "SuppSenderPTK") or
+		match(l5, "In_Supp","In_Auth","AuthGTKState") or
+		match(l4, "")
+		)
+
+	if lemma == "supplicant_wnm_sleep_thread_has_to_start":  #follows strictly the proof from uttamarin
+		(
+		match(l0, "∀") or
+		match(l1, "last") or
+		match(l2, "SuppWNMState") or
+		match(l4, "")
+		)
+
+	if lemma == "authenticator_ptk_nonce_pair_is_unique":  #follows strictly the proof from uttamarin
+		(
+		match(l0, "∀", "last") or
+		match(l0, "∥") or
+		match(l1, ": AuthEncryptedWithPTK.*#i$") or
+		match(l1, ": AuthEncryptedWithPTK.*#j$") or
+		match(l2, ": AuthSenderPTK.*#i$") or
+		match(l3, r"^[^∀∃]*\[\+\]") or
+		match(l4, ": AuthSenderPTK") or
+		match(l6, ": In_Supp", ": In_Auth", ": !AuthGTKState") or
+		match(l5, "")
+		)
+	
+
+
+
+
+print(l0, l1, l2, l3, l4, l5, l6)
+ranked = l0 + l1 + l2 + l3 + l4 + l5 + l6
+for i in ranked:
+	print(i)

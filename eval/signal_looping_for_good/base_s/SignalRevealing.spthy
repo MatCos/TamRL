@@ -1,0 +1,175 @@
+theory SignalRevealing
+begin
+
+builtins: diffie-hellman, symmetric-encryption
+functions: kdf/1, decrypts/2, true/0
+equations: decrypts(senc(m, k), k) = true
+
+heuristic: s
+
+restriction Eq:
+  "All a b #x. Eq(a, b) @ #x ==> a = b"
+
+restriction Neq:
+  "All a b #x. Neq(a, b) @ #x ==> not (a = b)"
+
+rule KeyGen:
+  [ Fr(~ltk), Fr(~prek) ]
+  -->
+  [ !SecretKeys($A, ~ltk, ~prek)
+  , !PublicKeys($A, 'g'^~ltk, 'g'^~prek)
+  , Out('g'^~ltk)
+  , Out('g'^~prek) ]
+
+rule RevealLtk:
+  [ !SecretKeys($A, ~ltk, ~prek) ]
+  --[ RevealLtk($A) ]->
+  [ Out(~ltk) ]
+
+rule RevealPrek:
+  [ !SecretKeys($A, ~ltk, ~prek) ]
+  --[ RevealPre($A) ]->
+  [ Out(~prek) ]
+
+rule RevealEphemeral:
+  [ !EphemeralDH($A, $B, ~x) ]
+  --[ RevealEphemeral($A, $B) ]->
+  [ Out(~x) ]
+
+rule SenderStart:
+  let dh1 = prepk^~ltk
+      dh2 = ltpk^~x
+      dh3 = prepk^~x
+      ss = kdf(<dh1, dh2, dh3>)
+      rk = kdf(<'rk', ss>)
+      ck = kdf(<'ck', ss>)
+      mk = kdf(<'mk', ck>)
+  in
+  [ Fr(~id), Fr(~x), Fr(~m)
+  , !SecretKeys($A, ~ltk, prek)
+  , !PublicKeys($B, ltpk, prepk) ]
+  --[ Neq($A, $B)
+    , RootKey(~id, $A, $B, rk)
+    , NewRootKey(~id, $A, $B, rk)
+    , Send(~m, $A, $B)
+    , GenEph('g'^~x) ]->
+  [ !EphemeralDH($A, $B, ~x)
+  , Session(~id, $A, 'S', ~x, $B, prepk, rk, ck)
+  , Out(<'g'^~x, senc(~m, mk)>) ]
+
+rule Send:
+  let new_ck = kdf(<'ck', ck>)
+      mk = kdf(<'mk', new_ck>)
+  in
+  [ Fr(~m)
+  , Session(~id, $A, 'S', ~x, $B, pc, rk, ck) ]
+  --[ Send(~m, $A, $B)
+    , RootKey(~id, $A, $B, rk)
+    , ChainKey(~id, new_ck) ]->
+  [ Session(~id, $A, 'S', ~x, $B, pc, rk, new_ck)
+  , Out(senc(~m, mk)) ]
+
+rule ReceiverStart:
+  let dh1 = ltpk^~prek
+      dh2 = pc^~ltk
+      dh3 = pc^~prek
+      ss = kdf(<dh1, dh2, dh3>)
+      rk = kdf(<'rk', ss>)
+      ck = kdf(<'ck', ss>)
+      mk = kdf(<'mk', ck>)
+  in
+  [ Fr(~id)
+  , !SecretKeys($A, ~ltk, ~prek)
+  , !PublicKeys($B, ltpk, prepk)
+  , In(<pc, enc>) ]
+  --[ Neq($A, $B)
+    , Neq(pc, DH_neutral)
+    , Neq(pc, 'g')
+    , RootKey(~id, $A, $B, rk)
+    , NewRootKey(~id, $A, $B, rk)
+    , Receive(~id, sdec(enc, mk), rk)
+    , Eq(decrypts(enc, mk), true) ]->
+  [ Session(~id, $A, 'R', ~prek, $B, pc, rk, ck) ]
+
+rule Receive:
+  let new_ck = kdf(<'ck', ck>)
+      mk = kdf(<'mk', new_ck>)
+  in
+  [ In(enc)
+  , Session(~id, $A, 'R', ~x, $B, pc, rk, ck) ]
+  --[ RootKey(~id, $A, $B, rk)
+    , Receive(sdec(enc, mk), $A, $B)
+    , Use(~id, 'g'^~x)
+    , Eq(decrypts(enc, mk), true) ]->
+  [ Session(~id, $A, 'R', ~x, $B, pc, rk, new_ck) ]
+
+rule OuterRatchetToSender:
+  let dhss = pc^~x
+      rk = kdf(<'rk', old_rk, dhss>)
+      ck = kdf(<'ck', old_rk, dhss>)
+      mk = kdf(<'mk', ck>)
+  in
+  [ Fr(~x), Fr(~m)
+  , Session(~id, $A, 'R', drop, $B, pc, old_rk, old_ck) ]
+  --[ RootKey(~id, $A, $B, rk)
+    , NewRootKey(~id, $A, $B, rk)
+    , Send(~m, $A, $B)
+    , GenEph('g'^~x)  ]->
+  [ !EphemeralDH($A, $B, ~x)
+  , Session(~id, $A, 'S', ~x, $B, pc, rk, ck)
+  , Out(<'g'^~x, senc(~m, mk)>) ]
+
+rule OuterRatchetToReceiver:
+  let dhss = pc^~x
+      rk = kdf(<'rk', old_rk, dhss>)
+      ck = kdf(<'ck', old_rk, dhss>)
+      mk = kdf(<'mk', ck>)
+  in
+  [ In(<pc, enc>)
+  , Session(~id, $A, 'S', ~x, $B, old_pc, old_rk, old_ck) ]
+  --[ Neq(pc, DH_neutral)
+    , Neq(pc, 'g')
+    , RootKey(~id, $A, $B, rk)
+    , NewRootKey(~id, $A, $B, rk)
+    , Receive(sdec(enc, mk), $A, $B)
+    , Eq(decrypts(enc, mk), true) ]->
+  [ Session(~id, $A, 'R', ~x, $B, pc, rk, ck) ]
+
+lemma Exec:
+  exists-trace
+  "Ex id1 id2 m a b rk #x #y.
+      Receive(m, b, a) @ #x & RootKey(id1, b, a, rk) @ #x
+    & Send(m, a, b) @ #y    & RootKey(id2, a, b, rk) @ #y"
+
+lemma Auto_OuterLoopStep[reuse,use_induction]:
+  "All id a b rk #a. RootKey(id, a, b, rk) @ #a & not NewRootKey(id, a, b, rk) @ #a
+    ==> Ex #b. NewRootKey(id, a, b, rk) @ #b & b < #a"
+
+// NOTE: <...> is right-associative. In the outer ratchet, we use two values to
+// derive a new root key, but ss will be unified with both.
+lemma Auto_RkSecrecy[reuse,use_induction]:
+  "All id a b ss #t. RootKey(id, a, b, kdf(<'rk', ss>)) @ #t
+    ==>   (not Ex #x. KU(ss) @ #x)
+        | (Ex #x. RevealLtk(a) @ #x)
+        | (Ex #x. RevealLtk(b) @ #x)
+        | (Ex #x. RevealPre(a) @ #x)
+        | (Ex #x. RevealPre(b) @ #x)
+        | (Ex #x. RevealEphemeral(a, b) @ #x)
+        | (Ex #x. RevealEphemeral(b, a) @ #x)"
+
+lemma Auto_CkSecrecy[reuse,use_induction,hide_lemma=OuterLoopStep,hide_lemma=RkSecrecy]:
+  "All id a b rk ck #t. ChainKey(id, ck) @ #t & RootKey(id, a, b, rk) @ #t
+    ==>   (not Ex #x. KU(ck) @ #x)
+        | (Ex ss #x. rk = kdf(<'rk', ss>) & KU(ss) @ #x)"
+
+lemma Auto_Secrecy[hide_lemma=OuterLoopStep]:
+  "All m a b #t. Send(m, a, b) @ #t
+    ==>   (not Ex #x. K(m) @ #x)
+        | (Ex #x. RevealLtk(a) @ #x)
+        | (Ex #x. RevealLtk(b) @ #x)
+        | (Ex #x. RevealPre(a) @ #x)
+        | (Ex #x. RevealPre(b) @ #x)
+        | (Ex #x. RevealEphemeral(a, b) @ #x)
+        | (Ex #x. RevealEphemeral(b, a) @ #x)"
+
+end
