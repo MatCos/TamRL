@@ -868,9 +868,14 @@ class MCTS:
                     prior_probs_heuristic_only[i],
                     prior_probs_model_only[i],
                 )
+            gate_probs = (
+                prior_probs_heuristic_only
+                if self.ucb_config.deactivate_model
+                else prior_probs
+            )
             sorted_indices = sorted(
                 range(num_proof_methods),
-                key=lambda i: prior_probs[i],
+                key=lambda i: gate_probs[i],
                 reverse=True,
             )
             eager_indices = sorted_indices[: self.expand_top_n]

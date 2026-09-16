@@ -157,7 +157,8 @@ class TestConfigMerge:
         from src.parser.parser_rl import parse_args_rl
 
         argv = ["train", "--config_path", str(config_file),
-                "--protocol", str(tmp_path)]
+                "--protocol", str(tmp_path),
+                "--save_path_prefix", str(tmp_path)]
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(sys, "argv", ["prog"] + argv)
             cfg = parse_args_rl()
@@ -174,7 +175,8 @@ class TestConfigMerge:
 
         argv = ["train", "--config_path", str(config_file),
                 "--batch_size", "128",
-                "--protocol", str(tmp_path)]
+                "--protocol", str(tmp_path),
+                "--save_path_prefix", str(tmp_path)]
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(sys, "argv", ["prog"] + argv)
             cfg = parse_args_rl()

@@ -143,7 +143,7 @@ def load_csv_results(
     folder_to_theory: dict[str, str] = {}
     for path_key, theory in build_folder_to_theory_mapping(models_dir).items():
         try:
-            rel = path_key.relative_to(root_dir)
+            rel = path_key.relative_to(models_dir)
             if rel.parts:
                 folder_to_theory.setdefault(rel.parts[0], theory)
         except ValueError:

@@ -71,7 +71,7 @@ python -m src.main.run train \
   --temperature=10 --value_discount=0.99 --value_penalty=8
 ```
 
-If running on macOS, append `--force_cpu` as MPS does not support nested tensors used by our implementation.
+If running on macOS, append `--force_cpu` as MPS does not support nested tensors used by our implementation. When running with memory constraints, consider reducing `--num_envs`, `--replay_buffer_capacity`, and `--cache_max_memory_mb`.
 
 Output is saved to `output/<run_id>/` by default, including:
 - `proof_trees/` — proof trees (`.json` and `.spthy`) for each solved lemma
@@ -85,7 +85,7 @@ The full training command for each protocol's best configuration is recorded in 
 
 ## Running Tamarin Baselines
 
-Running the Tamarin baselines requires the [Tamarin prover](https://github.com/niklasmedinger/Tamarin-ML-API) (either the original or our fork) installed and available as `tamarin-prover` on `PATH`.
+Running the Tamarin baselines [requires the Tamarin prover](https://tamarin-prover.com/install.html) available as `tamarin-prover` on `PATH`. If not already installed, you can use the [Tamarin HTTP server](https://github.com/niklasmedinger/Tamarin-ML-API) as well and symlink `tamarin-prover-json` to `tamarin-prover`.
 
 To run a single protocol variant:
 
@@ -96,12 +96,12 @@ python tamarin_wrapper.py yubikey_hsm/original/yubikey_hsm.spthy -t 7200 -c 8 --
 
 ## Pre-computed Results
 
-The full results as reported in the paper are at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20205359.svg)](https://doi.org/10.5281/zenodo.20205359).
+The full results as reported in the paper are at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20205358.svg)](https://doi.org/10.5281/zenodo.20205358).
 
 Download the results from Zenodo and extract them to `results/`:
 
 ```bash
-wget https://zenodo.org/record/20205359/files/results.zip?download=1 -O results.zip
+wget https://zenodo.org/records/22819846/files/results.zip?download=1 -O results.zip
 unzip results.zip
 ```
 
@@ -148,50 +148,19 @@ tamarin-prover --prove=sqn_ue_unique \
 
 The lemma name is encoded in the file name: `<theory>_<lemma>_search_<n>_complete_<n>.spthy`. Tamarin will re-check the proof and report whether it verifies successfully.
 
-## Loading Trained Models
+## Resuming Training
 
-Trained model checkpoints are stored in `results/best/artifacts/<run_id>/`. Due to size constraints, we only include the model weights for the best 5G AKA configuration (`9agfdtxf`).
-
-```python
-import torch
-from src.models.actor_critic import ActorCriticModel
-
-model = ActorCriticModel.load_model(
-    "results/best/artifacts/9agfdtxf/model_last.pt",
-    torch.device("cpu"),
-)
-```
-
-`load_model` reconstructs the full architecture from the checkpoint — no config objects needed.
-
-### Resuming Training
-
-To continue training from a checkpoint, use `--load_from_run` with `--save_path_prefix` pointing to the directory containing the run folder. This loads the model weights and optimizer state but creates a new run with a fresh ID, leaving the original checkpoint intact.
-
-Note that the MCTS search is an integral part of the training process — the trained model alone will not solve any lemmas without the search. The model weights are provided for transparency and inspection; reproducing the paper's results requires running the full training process with MCTS search.
-
-Example — continuing from the best 5G AKA configuration:
+Every run writes `model_last.pt` and `ckp_last.pt` into `output/<run_id>/`. To start a new run from one of those checkpoints:
 
 ```bash
-python -m src.main.run train \
-  --load_from_run=9agfdtxf \
-  --save_path_prefix=results/best/artifacts \
-  --protocol=eval/5G_AKA/base_s \
-  --batch_size=64 --min_usage_to_update=5 --replay_buffer_capacity=10000 \
-  --warmup_fraction=0 --backup_request_timeout=600 --cache_max_memory_mb=100000 \
-  --num_envs=16 --request_timeout=120 --stall_frequency=5 \
-  --learning_rate=0.0001 --branch_penalty=0 --time_penalty=0.3 \
-  --time_penalty_clip=180 --timeout_penalty=10 --search_budget=5000 \
-  --search_budget_increase_factor=1.5 --expand_top_n=3 --first_step=search \
-  --max_workers_per_lemma=4 --num_lemma_completes=3 --num_searches=15 \
-  --tokenizer_cache_size=100000 --tokenizer_max_length=512 --tokenizer=roberta-base \
-  --dim_transformer_feedforward=1024 --dropout=0 --n_transformer_head=8 \
-  --pfm_dim=512 --pfm_layers=2 --transformer_layers=4 \
-  --c_and=128 --heuristic_weight=0.2 --pb_c_base=19652 --pb_c_init=0.0001 \
-  --temperature=50 --value_discount=0.99 --value_penalty=100
+python -m src.main.run train --load_from_run=<run_id> ...
 ```
 
-If running on macOS, append `--force_cpu`. When running with memory constraints, consider reducing `--num_envs`, `--replay_buffer_capacity`, and `--cache_max_memory_mb`.
+This loads the model weights and the optimizer state, then creates a **new** run with a fresh ID, leaving the original checkpoint intact. Checkpoints are looked up under `--save_path_prefix` (default `output`), which is also where the new run is written — so loading a checkpoint stored elsewhere means pointing `--save_path_prefix` at its parent directory. `--load_from_checkpoint` (default `last`) selects which snapshot to load, i.e. `model_last.pt`.
+
+To continue a run *in place* instead — same ID, same output folder, same W&B run — use `--resume_run=<run_id>`.
+
+Note that the MCTS search is an integral part of the training process — a trained model alone will not solve any lemmas without the search.
 
 ## Known Limitations
 

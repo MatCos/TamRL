@@ -244,6 +244,7 @@ pyrightconfig.json
 output/*
 data/*
 results/*
+results.zip
 .vscode/*
 *.code-workspace
 wandb/*
